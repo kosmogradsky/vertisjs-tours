@@ -1,12 +1,71 @@
 import * as ThreeJS from './three.js';
 
+const data = {
+    panoramas: [
+        {
+            id: 0,
+            url: 'texture0.png',
+            pointers: [
+                {
+                    destinationPanoramaId: 1,
+                    x: 0.5,
+                    y: 0,
+                    z: 0.5,
+                },
+                {
+                    destinationPanoramaId: 1,
+                    x: -0.8,
+                    y: 0,
+                    z: -0.7,
+                }
+            ]
+        },
+        {
+            id: 1,
+            url: 'texture1.png',
+            pointers: [
+                {
+                    destinationPanoramaId: 0,
+                    x: 0.8,
+                    y: 0,
+                    z: 0.7,
+                },
+                {
+                    destinationPanoramaId: 1,
+                    x: -0.5,
+                    y: 0,
+                    z: -0.5,
+                }
+            ]
+        }
+    ],
+};
+
 const canvas = document.createElement('canvas');
 canvas.style.position = 'fixed';
 canvas.style.top = '0px';
 canvas.style.left = '0px';
 
+const uidiv = document.createElement('div');
+uidiv.style.position = 'fixed';
+uidiv.style.top = '0px';
+uidiv.style.left = '0px';
+
 const scene = new ThreeJS.Scene();
-const camera = new ThreeJS.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 200);
+const camera = new ThreeJS.PerspectiveCamera(
+    90, // Поле зрения (field of view, FOV)
+    window.innerWidth / window.innerHeight, // Соотношение сторон (aspect ratio)
+    0.1, // Ближняя плоскость отсечения (near clipping plane)
+    200 // Дальняя плоскость отсечения (far clipping plane)
+);
+
+for (const pointer of data.panoramas[0].pointers) {
+    const arrowImg = document.createElement('img');
+    arrowImg.classList.add('arrow-img');
+    arrowImg.src = './point.svg';
+
+    uidiv.appendChild(arrowImg);
+}
 
 const renderer = new ThreeJS.WebGLRenderer({
     canvas,
@@ -42,7 +101,7 @@ function render() {
 requestAnimationFrame(render);
 
 const loader = new ThreeJS.TextureLoader();
-const texture = loader.load('texture.png');
+const texture = loader.load('texture0.png');
 texture.colorSpace = ThreeJS.SRGBColorSpace;
 
 const sphereMaterial = new ThreeJS.MeshBasicMaterial({
@@ -55,6 +114,9 @@ sphereMesh.scale.x = -1;
 
 scene.add(sphereMesh);
 
+const LOWER_LIMIT = -90 / 180 * Math.PI;
+const HIGHER_LIMIT = (90 - 0.001) / 180 * Math.PI;
+const PAN_SPEED_FACTOR = 4;
 const dragHandler = {
     isDragging: false,
     handleEvent(e) {
@@ -63,9 +125,12 @@ const dragHandler = {
         }
 
         if (this.isDragging && e.type === 'mousemove') {
-            lookingAt.theta += e.movementX / 720 * Math.PI;
-            lookingAt.phi += e.movementY / 720 * Math.PI;
-            lookingAt.phi = Math.max(-90 / 180 * Math.PI, Math.min((90 - 0.001) / 180 * Math.PI, lookingAt.phi));
+            lookingAt.theta += e.movementX / PAN_SPEED_FACTOR * ThreeJS.MathUtils.DEG2RAD;
+            lookingAt.phi += e.movementY / PAN_SPEED_FACTOR * ThreeJS.MathUtils.DEG2RAD;
+            lookingAt.phi = Math.max(
+                LOWER_LIMIT,
+                Math.min(HIGHER_LIMIT, lookingAt.phi)
+            );
             lookingAt.needsUpdate = true;
         }
 
@@ -80,3 +145,4 @@ canvas.addEventListener('mouseup', dragHandler);
 document.body.addEventListener('mouseleave', dragHandler);
 
 document.body.appendChild(canvas);
+document.body.appendChild(uidiv);
