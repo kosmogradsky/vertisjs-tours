@@ -1,5 +1,7 @@
 import * as ThreeJS from './three.js';
 
+let currentId = 0;
+
 const data = {
     panoramas: [
         {
@@ -14,7 +16,7 @@ const data = {
                 },
                 {
                     destinationPanoramaId: 1,
-                    x: -0.8,
+                    x: -0.3,
                     y: 0,
                     z: -0.7,
                 }
@@ -31,7 +33,7 @@ const data = {
                     z: 0.7,
                 },
                 {
-                    destinationPanoramaId: 1,
+                    destinationPanoramaId: 0,
                     x: -0.5,
                     y: 0,
                     z: -0.5,
@@ -40,6 +42,8 @@ const data = {
         }
     ],
 };
+
+let pointers = data.panoramas[0].pointers;
 
 const canvas = document.createElement('canvas');
 canvas.style.position = 'fixed';
@@ -59,13 +63,29 @@ const camera = new ThreeJS.PerspectiveCamera(
     200 // Дальняя плоскость отсечения (far clipping plane)
 );
 
-for (const pointer of data.panoramas[0].pointers) {
-    const arrowImg = document.createElement('img');
-    arrowImg.classList.add('arrow-img');
-    arrowImg.src = './point.svg';
-
-    uidiv.appendChild(arrowImg);
+function allocatePointers() {
+    for (const pointer of pointers) {
+        const arrowVec = new ThreeJS.Vector3(
+            pointer.x,
+            pointer.y,
+            pointer.z
+        ).project(camera);
+        arrowVec.x = (arrowVec.x + 1) * window.innerWidth / 2;
+        arrowVec.y = (-arrowVec.y + 1) * window.innerHeight / 2;
+        
+        const arrowImg = document.createElement('img');
+        arrowImg.src = './point.svg';
+        arrowImg.classList.add('arrow-img');
+        arrowImg.style.translate = `${ arrowVec.x }px ${ arrowVec.y }px`;
+        arrowImg.style.visibility = arrowVec.z <= 1 ? 'visible' : 'hidden';
+        arrowImg.dataset.destinationId = pointer.destinationPanoramaId;
+    
+        uidiv.appendChild(arrowImg);
+    
+        pointer.element = arrowImg;
+    }
 }
+allocatePointers();
 
 const renderer = new ThreeJS.WebGLRenderer({
     canvas,
@@ -79,6 +99,8 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
 });
 
+let pointersNeedUpdate = false;
+const OMNIVEC = new ThreeJS.Vector3();
 const lookingAt = {
     theta: 0,
     phi: 0,
@@ -93,9 +115,27 @@ function render() {
         camera.lookAt(new ThreeJS.Vector3().setFromSpherical(camsph));
 
         lookingAt.needsUpdate = false;
+        pointersNeedUpdate = true;
     }
 
     renderer.render(scene, camera);
+
+    if (pointersNeedUpdate) {
+        for (const pointer of pointers) {
+            OMNIVEC.x = pointer.x;
+            OMNIVEC.y = pointer.y;
+            OMNIVEC.z = pointer.z;
+            OMNIVEC.project(camera);
+            OMNIVEC.x = (OMNIVEC.x + 1) * window.innerWidth / 2;
+            OMNIVEC.y = (-OMNIVEC.y + 1) * window.innerHeight / 2;
+    
+            pointer.element.style.translate = `${ OMNIVEC.x }px ${ OMNIVEC.y }px`;
+            pointer.element.style.visibility = OMNIVEC.z <= 1 ? 'visible' : 'hidden';
+        }
+
+        pointersNeedUpdate = false;
+    }
+
     requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
@@ -146,3 +186,32 @@ document.body.addEventListener('mouseleave', dragHandler);
 
 document.body.appendChild(canvas);
 document.body.appendChild(uidiv);
+
+function reloadTexture(e) {
+    const destinationId = e.target.dataset.destinationId;
+    const destination = data.panoramas.find(
+        panorama => panorama.id.toString() === destinationId
+    );
+    
+    const texture = loader.load(destination.url);
+    texture.colorSpace = ThreeJS.SRGBColorSpace;
+
+    sphereMaterial.map = texture;
+    currentId = destinationId;
+}
+
+function reallocatePointers() {
+    for (const pointer of pointers) {
+        pointer.element.remove();
+        delete pointer.element;
+    }
+
+    pointers = data.panoramas[currentId].pointers;
+
+    allocatePointers();
+}
+
+uidiv.addEventListener('click', (e) => {
+    reloadTexture(e);
+    reallocatePointers(e);
+});
