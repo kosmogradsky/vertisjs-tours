@@ -63,26 +63,31 @@ const camera = new ThreeJS.PerspectiveCamera(
     200 // Дальняя плоскость отсечения (far clipping plane)
 );
 
+const OMNIVEC = new ThreeJS.Vector3();
+function alignArrowImg(pointer) {
+    OMNIVEC.x = pointer.x;
+    OMNIVEC.y = pointer.y;
+    OMNIVEC.z = pointer.z;
+    OMNIVEC.project(camera);
+    OMNIVEC.x = (OMNIVEC.x + 1) * window.innerWidth / 2;
+    OMNIVEC.y = (-OMNIVEC.y + 1) * window.innerHeight / 2;
+
+    pointer.element.style.translate = `${ OMNIVEC.x }px ${ OMNIVEC.y }px`;
+    pointer.element.style.visibility = OMNIVEC.z <= 1 ? 'visible' : 'hidden';
+}
+
+function createArrowImg(pointer) {
+    pointer.element = document.createElement('img');
+    pointer.element.src = './point.svg';
+    pointer.element.classList.add('arrow-img');
+    pointer.element.dataset.destinationId = pointer.destinationPanoramaId;
+    uidiv.appendChild(pointer.element);
+}
+
 function allocatePointers() {
     for (const pointer of pointers) {
-        const arrowVec = new ThreeJS.Vector3(
-            pointer.x,
-            pointer.y,
-            pointer.z
-        ).project(camera);
-        arrowVec.x = (arrowVec.x + 1) * window.innerWidth / 2;
-        arrowVec.y = (-arrowVec.y + 1) * window.innerHeight / 2;
-        
-        const arrowImg = document.createElement('img');
-        arrowImg.src = './point.svg';
-        arrowImg.classList.add('arrow-img');
-        arrowImg.style.translate = `${ arrowVec.x }px ${ arrowVec.y }px`;
-        arrowImg.style.visibility = arrowVec.z <= 1 ? 'visible' : 'hidden';
-        arrowImg.dataset.destinationId = pointer.destinationPanoramaId;
-    
-        uidiv.appendChild(arrowImg);
-    
-        pointer.element = arrowImg;
+        createArrowImg(pointer);
+        alignArrowImg(pointer);
     }
 }
 allocatePointers();
@@ -100,7 +105,6 @@ window.addEventListener('resize', () => {
 });
 
 let pointersNeedUpdate = false;
-const OMNIVEC = new ThreeJS.Vector3();
 const lookingAt = {
     theta: 0,
     phi: 0,
@@ -109,10 +113,10 @@ const lookingAt = {
 
 function render() {
     if (lookingAt.needsUpdate) {
-        const camsph = new ThreeJS.Spherical().setFromVector3(new ThreeJS.Vector3(0, 0, -1));
-        camsph.theta += lookingAt.theta;
-        camsph.phi -= lookingAt.phi;
-        camera.lookAt(new ThreeJS.Vector3().setFromSpherical(camsph));
+        const sphericalDirection = new ThreeJS.Spherical().setFromVector3(new ThreeJS.Vector3(0, 0, -1));
+        sphericalDirection.theta += lookingAt.theta;
+        sphericalDirection.phi -= lookingAt.phi;
+        camera.lookAt(new ThreeJS.Vector3().setFromSpherical(sphericalDirection));
 
         lookingAt.needsUpdate = false;
         pointersNeedUpdate = true;
@@ -122,15 +126,7 @@ function render() {
 
     if (pointersNeedUpdate) {
         for (const pointer of pointers) {
-            OMNIVEC.x = pointer.x;
-            OMNIVEC.y = pointer.y;
-            OMNIVEC.z = pointer.z;
-            OMNIVEC.project(camera);
-            OMNIVEC.x = (OMNIVEC.x + 1) * window.innerWidth / 2;
-            OMNIVEC.y = (-OMNIVEC.y + 1) * window.innerHeight / 2;
-    
-            pointer.element.style.translate = `${ OMNIVEC.x }px ${ OMNIVEC.y }px`;
-            pointer.element.style.visibility = OMNIVEC.z <= 1 ? 'visible' : 'hidden';
+            alignArrowImg(pointer);
         }
 
         pointersNeedUpdate = false;
@@ -157,32 +153,25 @@ scene.add(sphereMesh);
 const LOWER_LIMIT = -90 / 180 * Math.PI;
 const HIGHER_LIMIT = (90 - 0.001) / 180 * Math.PI;
 const PAN_SPEED_FACTOR = 4;
-const dragHandler = {
-    isDragging: false,
-    handleEvent(e) {
-        if (e.type === 'mousedown') {
-           this.isDragging = true; 
-        }
-
-        if (this.isDragging && e.type === 'mousemove') {
-            lookingAt.theta += e.movementX / PAN_SPEED_FACTOR * ThreeJS.MathUtils.DEG2RAD;
-            lookingAt.phi += e.movementY / PAN_SPEED_FACTOR * ThreeJS.MathUtils.DEG2RAD;
-            lookingAt.phi = Math.max(
-                LOWER_LIMIT,
-                Math.min(HIGHER_LIMIT, lookingAt.phi)
-            );
-            lookingAt.needsUpdate = true;
-        }
-
-        if (e.type === 'mouseup' || e.type === 'mouseleave') {
-            this.isDragging = false;
-        }
+let isDragging = false;
+const handleMousemove = (e) => {
+    if (isDragging) {
+        lookingAt.theta += e.movementX / PAN_SPEED_FACTOR * ThreeJS.MathUtils.DEG2RAD;
+        lookingAt.phi += e.movementY / PAN_SPEED_FACTOR * ThreeJS.MathUtils.DEG2RAD;
+        lookingAt.phi = Math.max(
+            LOWER_LIMIT,
+            Math.min(HIGHER_LIMIT, lookingAt.phi)
+        );
+        lookingAt.needsUpdate = true;
     }
 };
-canvas.addEventListener('mousedown', dragHandler);
-canvas.addEventListener('mousemove', dragHandler);
-canvas.addEventListener('mouseup', dragHandler);
-document.body.addEventListener('mouseleave', dragHandler);
+
+const startDragging = () => { isDragging = true };
+const endDragging = () => { isDragging = false };
+canvas.addEventListener('mousedown', startDragging);
+canvas.addEventListener('mousemove', handleMousemove);
+canvas.addEventListener('mouseup', endDragging);
+document.body.addEventListener('mouseleave', endDragging);
 
 document.body.appendChild(canvas);
 document.body.appendChild(uidiv);
