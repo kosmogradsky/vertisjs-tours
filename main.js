@@ -9,10 +9,10 @@ const data = {
             url: 'texture0.png',
             pointers: [
                 {
-                    destinationPanoramaId: 1,
-                    x: 0.5,
+                    destinationPanoramaId: 2,
+                    x: 0.6,
                     y: 0,
-                    z: 0.5,
+                    z: -0.4,
                 },
                 {
                     destinationPanoramaId: 1,
@@ -28,15 +28,15 @@ const data = {
             pointers: [
                 {
                     destinationPanoramaId: 0,
-                    x: 0.8,
+                    x: -0.6,
                     y: 0,
-                    z: 0.7,
+                    z: 0.8,
                 },
                 {
-                    destinationPanoramaId: 0,
-                    x: -0.5,
+                    destinationPanoramaId: 3,
+                    x: 1,
                     y: 0,
-                    z: -0.5,
+                    z: 0.1,
                 }
             ]
         }
